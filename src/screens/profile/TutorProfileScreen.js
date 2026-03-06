@@ -1,127 +1,125 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Linking } from 'react-native';
-import { Card, Button, Text, Title, Avatar, Chip, Divider } from 'react-native-paper';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  FlatList,
+  Linking,
+} from 'react-native';
+import TutorHeader from '@/components/tutor/TutorHeader';
+import ReviewItem from '@/components/tutor/ReviewItem';
+import ContactButton from '@/components/common/ContactButton';
+import StarRating from '@/components/common/StarRating';
+import { COLORS, MOCK_REVIEWS, MOCK_TUTORS } from '../../utils/constants';
 
-/**
- * @param {Object} props
- * @param {import('@react-navigation/native').NavigationProp<any>} props.navigation
- * @param {Object} props.route
- * @param {{tutorId: string}} props.route.params
- */
 const TutorProfileScreen = ({ navigation, route }) => {
-  const { tutorId } = route.params;
+  const { tutorId } = route.params || {};
+  const [loading, setLoading] = useState(true);
 
-  // Mock tutor data (in real app, fetch based on tutorId)
-  const tutor = {
-    id: tutorId,
-    name: 'Sarah Johnson',
-    bio: 'Mathematics enthusiast with 3 years of tutoring experience. I specialize in Calculus, Linear Algebra, and Statistics. My teaching style focuses on building strong fundamentals and problem-solving skills.',
-    rate: 25,
-    rating: 4.8,
-    reviewCount: 24,
-    subjects: ['Calculus', 'Linear Algebra', 'Statistics'],
-    line: 'sarahjohnson',
-    instagram: 'sarahjohnson_tutor',
-    reviews: [
-      { id: '1', student: 'John D.', rating: 5, comment: 'Excellent tutor! Very patient and clear.' },
-      { id: '2', student: 'Lisa M.', rating: 4.5, comment: 'Really helped me understand calculus concepts.' },
-    ],
+  const tutor = useMemo(
+    () => MOCK_TUTORS.find((item) => item.id === tutorId),
+    [tutorId]
+  );
+
+  const reviews = useMemo(
+    () => MOCK_REVIEWS.filter((review) => review.tutorId === tutorId),
+    [tutorId]
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 350);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleOpenLine = () => {
+    if (!tutor?.lineId) {
+      return;
+    }
+    Linking.openURL(`https://line.me/ti/p/~${tutor.lineId}`);
   };
 
-  const openLine = () => {
-    Linking.openURL(`line://ti/p/${tutor.line}`);
+  const handleOpenInstagram = () => {
+    if (!tutor?.instagramHandle) {
+      return;
+    }
+    Linking.openURL(`https://instagram.com/${tutor.instagramHandle}`);
   };
 
-  const openInstagram = () => {
-    Linking.openURL(`instagram://user?username=${tutor.instagram}`);
-  };
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading tutor profile...</Text>
+      </View>
+    );
+  }
+
+  if (!tutor) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorTitle}>Tutor not found</Text>
+        <Text style={styles.errorSubtitle}>Please go back and try again.</Text>
+        <TouchableOpacity style={styles.errorButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.errorButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const visibleReviews = reviews.slice(0, 5);
 
   return (
-    <ScrollView style={styles.container}>
-      <Card style={styles.profileCard}>
-        <Card.Content style={styles.profileHeader}>
-          <Avatar.Text size={80} label={tutor.name.split(' ').map(n => n[0]).join('')} />
-          <View style={styles.profileInfo}>
-            <Title style={styles.name}>{tutor.name}</Title>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <TutorHeader tutor={tutor} />
+
+      <View style={styles.divider} />
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Contact Tutor</Text>
+        <View style={styles.contactList}>
+          <ContactButton
+            icon="chat"
+            label="Contact via Line"
+            onPress={handleOpenLine}
+          />
+          <ContactButton
+            icon="camera-alt"
+            label="Contact via Instagram"
+            onPress={handleOpenInstagram}
+          />
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Reviews ({reviews.length})</Text>
             <View style={styles.ratingRow}>
-              <Chip icon="star" style={styles.ratingChip}>
-                {tutor.rating}
-              </Chip>
-              <Text style={styles.reviewText}>({tutor.reviewCount} reviews)</Text>
+              <StarRating rating={tutor.rating} size={16} />
+              <Text style={styles.ratingText}>{tutor.rating} average</Text>
             </View>
-            <Text style={styles.rate}>${tutor.rate}/hour</Text>
           </View>
-        </Card.Content>
-      </Card>
+        </View>
 
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title>About</Title>
-          <Text style={styles.bio}>{tutor.bio}</Text>
-        </Card.Content>
-      </Card>
+        <FlatList
+          data={visibleReviews}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <ReviewItem review={item} />}
+          scrollEnabled={false}
+          contentContainerStyle={styles.reviewList}
+        />
 
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title>Subjects</Title>
-          <View style={styles.subjectContainer}>
-            {tutor.subjects.map((subject, index) => (
-              <Chip key={index} style={styles.subjectChip}>
-                {subject}
-              </Chip>
-            ))}
-          </View>
-        </Card.Content>
-      </Card>
-
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title>Contact</Title>
-          <Text style={styles.contactText}>Connect with this tutor:</Text>
-        </Card.Content>
-        <Card.Actions>
-          <Button 
-            mode="contained" 
-            icon="message" 
-            onPress={openLine}
-            style={styles.contactButton}
-          >
-            Line
-          </Button>
-          <Button 
-            mode="contained" 
-            icon="instagram" 
-            onPress={openInstagram}
-            style={styles.contactButton}
-          >
-            Instagram
-          </Button>
-        </Card.Actions>
-      </Card>
-
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title>Reviews</Title>
-          {tutor.reviews.map((review) => (
-            <View key={review.id} style={styles.review}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewStudent}>{review.student}</Text>
-                <Chip icon="star" size={20}>{review.rating}</Chip>
-              </View>
-              <Text style={styles.reviewComment}>{review.comment}</Text>
-              <Divider style={styles.divider} />
-            </View>
-          ))}
-        </Card.Content>
-        <Card.Actions>
-          <Button 
-            mode="outlined" 
-            onPress={() => navigation.navigate('AddReview')}
-          >
-            Write a Review
-          </Button>
-        </Card.Actions>
-      </Card>
+        {reviews.length > 5 && (
+          <TouchableOpacity style={styles.seeAllButton}>
+            <Text style={styles.seeAllText}>See all reviews</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -129,85 +127,84 @@ const TutorProfileScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.white,
   },
-  profileCard: {
-    margin: 16,
+  section: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.gray[900],
+    marginBottom: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.gray[200],
+    marginHorizontal: 16,
+  },
+  contactList: {
+    gap: 12,
+  },
+  sectionHeader: {
     marginBottom: 8,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  profileInfo: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  name: {
-    fontSize: 20,
-    marginBottom: 4,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
+    gap: 8,
   },
-  ratingChip: {
-    backgroundColor: '#FFF3E0',
-    marginRight: 8,
+  ratingText: {
+    fontSize: 13,
+    color: COLORS.gray[600],
+    fontWeight: '600',
   },
-  reviewText: {
-    color: '#666',
+  reviewList: {
+    paddingBottom: 8,
   },
-  rate: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6200EE',
-    marginTop: 4,
-  },
-  card: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-  },
-  bio: {
+  seeAllButton: {
+    alignSelf: 'flex-start',
     marginTop: 8,
-    lineHeight: 22,
-    color: '#666',
+    paddingVertical: 6,
   },
-  subjectContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
-  subjectChip: {
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  contactText: {
-    marginTop: 8,
-    color: '#666',
-  },
-  contactButton: {
-    marginHorizontal: 4,
-  },
-  review: {
-    marginTop: 12,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    backgroundColor: COLORS.white,
+    padding: 24,
   },
-  reviewStudent: {
-    fontWeight: 'bold',
-  },
-  reviewComment: {
-    color: '#666',
-    marginTop: 4,
-  },
-  divider: {
+  loadingText: {
     marginTop: 12,
+    fontSize: 14,
+    color: COLORS.gray[600],
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.gray[900],
+    marginBottom: 6,
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: COLORS.gray[600],
+    marginBottom: 16,
+  },
+  errorButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  errorButtonText: {
+    color: COLORS.backgroundDark,
+    fontWeight: '700',
   },
 });
 

@@ -1,0 +1,44 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "studier-78f4d",
+          "appId": "1:1061613682883:android:3c970728005c98f7d66276",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "studier-78f4d",
+          "configurations": {
+            "android": "1:1061613682883:android:3c970728005c98f7d66276",
+            "ios": "1:1061613682883:ios:22872a89e1805eced66276",
+            "web": "1:1061613682883:web:5ecd1a307307c37dd66276"
+          }
+        }
+      }
+    }
+  }
+}

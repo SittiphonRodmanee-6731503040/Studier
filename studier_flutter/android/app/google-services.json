@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1061613682883",
+    "firebase_url": "https://studier-78f4d-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "studier-78f4d",
+    "storage_bucket": "studier-78f4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061613682883:android:3c970728005c98f7d66276",
+        "android_client_info": {
+          "package_name": "com.studier.studier_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKviNIMK391l55pQ_qmFnRD6jXk-d9M9A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
