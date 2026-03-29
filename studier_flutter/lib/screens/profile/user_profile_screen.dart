@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,7 +8,6 @@ import '../../context/user_provider.dart';
 import '../../models/tutor_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
-import '../../services/firebase_service.dart';
 import '../../utils/constants.dart';
 
 /// UserProfileScreen — matches the attached userprofile/code.html reference.
@@ -455,30 +455,39 @@ class _AvatarSectionState extends State<_AvatarSection> {
       final bytes = await image.readAsBytes();
       setState(() => _pickedBytes = bytes);
 
-      // Upload to Firebase Storage and get persistent URL
-      try {
-        final downloadUrl = await FirebaseService.instance.uploadAvatar(
-          widget.auth.currentUser!.id,
-          bytes,
+      // Upload to Firebase Storage and save URL to Firestore
+      final uid = widget.auth.currentUser?.id;
+      if (uid == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Not logged in'),
+            backgroundColor: Colors.red,
+          ),
         );
+        return;
+      }
 
-        // Save the persistent download URL to Firestore
+      try {
+        // 1. Upload to Firebase Storage
+        final ref = FirebaseStorage.instance.ref('avatars/$uid.jpg');
+        await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+        
+        // 2. Get download URL
+        final downloadUrl = await ref.getDownloadURL();
+        
+        // 3. Save URL to Firestore
         await widget.auth.updateProfile(avatarUrl: downloadUrl);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile picture updated!'),
-              behavior: SnackBarBehavior.floating,
-            ),
+            const SnackBar(content: Text('Profile picture updated!')),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to upload: $e'),
-              behavior: SnackBarBehavior.floating,
+              content: Text('Upload failed: $e'),
               backgroundColor: Colors.red,
             ),
           );
