@@ -7,6 +7,7 @@ import '../../context/user_provider.dart';
 import '../../models/tutor_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/firebase_service.dart';
 import '../../utils/constants.dart';
 
 /// UserProfileScreen — matches the attached userprofile/code.html reference.
@@ -454,16 +455,34 @@ class _AvatarSectionState extends State<_AvatarSection> {
       final bytes = await image.readAsBytes();
       setState(() => _pickedBytes = bytes);
 
-      // Also persist the path (useful on native; on web this is a blob URL).
-      await widget.auth.updateProfile(avatarUrl: image.path);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile picture updated!'),
-            behavior: SnackBarBehavior.floating,
-          ),
+      // Upload to Firebase Storage and get persistent URL
+      try {
+        final downloadUrl = await FirebaseService.instance.uploadAvatar(
+          widget.auth.currentUser!.id,
+          bytes,
         );
+
+        // Save the persistent download URL to Firestore
+        await widget.auth.updateProfile(avatarUrl: downloadUrl);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload: $e'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
