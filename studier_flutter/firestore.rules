@@ -2,16 +2,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Users collection
+    // SECURITY: Users can only read their own profile OR public tutor profiles
     match /users/{userId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || resource.data.isTutor == true);
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Users cannot delete accounts directly
     }
 
     // Reviews collection
+    // SECURITY: Validate reviewer identity and rating range
     match /reviews/{reviewId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.resource.data.reviewerId == request.auth.uid &&
+        request.resource.data.rating >= 1 && 
+        request.resource.data.rating <= 5 &&
+        request.resource.data.tutorId is string &&
+        request.resource.data.comment is string;
+      allow update: if request.auth != null && 
+        resource.data.reviewerId == request.auth.uid;
+      allow delete: if request.auth != null && 
+        resource.data.reviewerId == request.auth.uid;
     }
   }
 }

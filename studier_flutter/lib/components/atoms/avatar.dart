@@ -15,9 +15,16 @@ class Avatar extends StatelessWidget {
   });
 
   /// Returns the right [ImageProvider] for network URLs vs local assets.
+  /// SECURITY: Only HTTPS URLs are allowed for network images
   ImageProvider _resolveImage() {
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    if (imageUrl.startsWith('https://')) {
       return NetworkImage(imageUrl);
+    }
+    // SECURITY: Reject insecure HTTP URLs - treat as asset or show default
+    if (imageUrl.startsWith('http://')) {
+      // Log warning in debug mode, return placeholder
+      debugPrint('SECURITY WARNING: HTTP URL rejected for avatar: $imageUrl');
+      return const AssetImage('assets/images/default_avatar.png');
     }
     return AssetImage(imageUrl);
   }

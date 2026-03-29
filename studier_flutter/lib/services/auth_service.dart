@@ -10,6 +10,7 @@ import 'firebase_service.dart';
 ///
 /// When [AppConfig.useMockData] is `true`  → in-memory mock (no network).
 /// When `false`                            → Firebase Auth + Firestore.
+/// SECURITY: Mock mode only available in debug builds
 class AuthService extends ChangeNotifier {
   AuthService() {
     if (!AppConfig.useMockData) {
@@ -53,8 +54,9 @@ class AuthService extends ChangeNotifier {
   /// Log in with email + password.
   /// Returns `true` on success, `false` on failure.
   Future<bool> login(String email, String password) async {
-    if (AppConfig.useMockData) {
-      return _mockLogin(email, password);
+    // SECURITY: Mock login only in debug mode
+    if (kDebugMode && AppConfig.useMockData) {
+      return _mockLogin(email);
     }
     try {
       final cred = await fb.FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -71,7 +73,9 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Quick mock login — bypass password (for demo / testing).
+  /// SECURITY: Only available in debug mode
   void loginAsUser(AppUser user) {
+    if (!kDebugMode) return;
     _currentUser = user;
     notifyListeners();
   }
@@ -84,11 +88,11 @@ class AuthService extends ChangeNotifier {
     String university = '',
     String major = '',
   }) async {
-    if (AppConfig.useMockData) {
+    // SECURITY: Mock register only in debug mode
+    if (kDebugMode && AppConfig.useMockData) {
       return _mockRegister(
         name: name,
         email: email,
-        password: password,
         university: university,
         major: major,
       );
@@ -104,7 +108,6 @@ class AuthService extends ChangeNotifier {
         id: uid,
         name: name,
         email: email.trim().toLowerCase(),
-        password: '', // not stored in Firestore
         avatarUrl: '',
         university: university,
         major: major,
@@ -249,14 +252,14 @@ class AuthService extends ChangeNotifier {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // MOCK-ONLY helpers (unchanged from original)
+  // MOCK-ONLY helpers (DEBUG MODE ONLY - stripped from release builds)
   // ══════════════════════════════════════════════════════════════════════════
 
-  bool _mockLogin(String email, String password) {
+  /// Mock login by email only (no password validation in mock mode)
+  /// SECURITY: Only available in debug builds via kDebugMode check
+  bool _mockLogin(String email) {
     final match = _users.where(
-      (u) =>
-          u.email.toLowerCase() == email.toLowerCase() &&
-          u.password == password,
+      (u) => u.email.toLowerCase() == email.toLowerCase(),
     );
     if (match.isNotEmpty) {
       _currentUser = match.first;
@@ -269,7 +272,6 @@ class AuthService extends ChangeNotifier {
   bool _mockRegister({
     required String name,
     required String email,
-    required String password,
     String university = '',
     String major = '',
   }) {
@@ -280,7 +282,6 @@ class AuthService extends ChangeNotifier {
       id: 'u${_users.length + 1}',
       name: name,
       email: email,
-      password: password,
       avatarUrl: 'https://i.pravatar.cc/300?img=${50 + _users.length}',
       university: university,
       major: major,

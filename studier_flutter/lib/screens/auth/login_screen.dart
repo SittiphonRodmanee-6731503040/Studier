@@ -95,9 +95,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppColors.white),
                     decoration: _inputDecoration('Email'),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Email is required';
+                      if (v == null || v.isEmpty) return 'Invalid Email or Password';
                       if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
-                        return 'Enter a valid email';
+                        return 'Invalid Email or Password';
                       }
                       return null;
                     },
@@ -119,9 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Password is required';
+                      if (v == null || v.isEmpty) return 'Invalid Email or Password';
                       if (v.length < 6) {
-                        return 'At least 6 characters';
+                        return 'Invalid Email or Password';
                       }
                       return null;
                     },

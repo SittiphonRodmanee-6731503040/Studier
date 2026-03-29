@@ -3,8 +3,8 @@ import '../models/user_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified user list.  Users who are also tutors have isTutor = true and
-// tutor-specific fields populated.  Each entry includes mock email / password
-// so the data store is ready for future authentication.
+// tutor-specific fields populated.
+// SECURITY: No passwords stored in mock data - authentication handled by Firebase
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The currently logged-in mock user (non-tutor student).
@@ -12,7 +12,6 @@ const AppUser kMockCurrentUser = AppUser(
   id: 'u1',
   name: 'Alex Chen',
   email: 'alex.chen@stanford.edu',
-  password: 'password123',
   avatarUrl: 'https://i.pravatar.cc/300?img=52',
   university: 'Stanford University',
   major: 'Mechanical Engineering',
@@ -31,7 +30,6 @@ final List<AppUser> kMockUsers = [
     id: '1',
     name: 'Sarah Jenkins',
     email: 'sarah.jenkins@chula.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/Sarah Jenkins.png',
     university: 'Chulalongkorn University',
     major: 'Mathematics',
@@ -58,7 +56,6 @@ final List<AppUser> kMockUsers = [
     id: '2',
     name: 'David Chen',
     email: 'david.chen@tu.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/David Chen.png',
     university: 'Thammasat University',
     major: 'Computer Science',
@@ -84,7 +81,6 @@ final List<AppUser> kMockUsers = [
     id: '3',
     name: 'Elena Rodriguez',
     email: 'elena.r@ku.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/Elena Rodriguez.png',
     university: 'Kasetsart University',
     major: 'Applied Mathematics',
@@ -110,7 +106,6 @@ final List<AppUser> kMockUsers = [
     id: '4',
     name: 'Somchai Patel',
     email: 'somchai.p@chula.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/Somchai Patel.png',
     university: 'Chulalongkorn University',
     major: 'Physics',
@@ -136,7 +131,6 @@ final List<AppUser> kMockUsers = [
     id: '5',
     name: 'Ploy Wongsakorn',
     email: 'ploy.w@mahidol.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/Ploy Wongsakorn.png',
     university: 'Mahidol University',
     major: 'Biology',
@@ -162,7 +156,6 @@ final List<AppUser> kMockUsers = [
     id: '6',
     name: 'Natthapong Lee',
     email: 'natthapong.l@tu.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/Natthapong Lee.png',
     university: 'Thammasat University',
     major: 'History',
@@ -188,7 +181,6 @@ final List<AppUser> kMockUsers = [
     id: '7',
     name: 'Ananya Sharma',
     email: 'ananya.s@mahidol.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/Ananya Sharma.png',
     university: 'Mahidol University',
     major: 'Chemistry',
@@ -214,7 +206,6 @@ final List<AppUser> kMockUsers = [
     id: '8',
     name: 'James Tanaka',
     email: 'james.t@kmutt.ac.th',
-    password: 'tutor123',
     avatarUrl: 'assets/images/James Tanaka.png',
     university: 'KMUTT',
     major: 'Computer Engineering',

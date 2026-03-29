@@ -2,11 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Data model for a user (student or tutor).
 /// Tutors are users too — their tutor-specific fields are embedded here.
+/// SECURITY: Password is never stored client-side - Firebase Auth handles authentication
 class AppUser {
   final String id;
   final String name;
   final String email;
-  final String password; // Mock only — would be hashed server-side
   final String avatarUrl;
   final String university;
   final String major;
@@ -32,7 +32,6 @@ class AppUser {
     required this.id,
     required this.name,
     required this.email,
-    required this.password,
     required this.avatarUrl,
     required this.university,
     required this.major,
@@ -58,7 +57,6 @@ class AppUser {
     String? id,
     String? name,
     String? email,
-    String? password,
     String? avatarUrl,
     String? university,
     String? major,
@@ -82,7 +80,6 @@ class AppUser {
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
-      password: password ?? this.password,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       university: university ?? this.university,
       major: major ?? this.major,
@@ -138,7 +135,6 @@ class AppUser {
       id: id ?? map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       email: map['email'] as String? ?? '',
-      password: '', // never stored in Firestore
       avatarUrl: map['avatarUrl'] as String? ?? '',
       university: map['university'] as String? ?? '',
       major: map['major'] as String? ?? '',
