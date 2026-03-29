@@ -315,7 +315,8 @@ class _AvatarSectionState extends State<_AvatarSection> {
     // If user just picked a new photo this session, show it from memory.
     if (_pickedBytes != null) return MemoryImage(_pickedBytes!);
 
-    final url = widget.user.avatarUrl;
+    // Read the latest avatarUrl from AuthService to get updated URL after upload
+    final url = widget.auth.currentUser?.avatarUrl ?? widget.user.avatarUrl;
     if (url.isEmpty) {
       return const AssetImage('assets/images/placeholder.png');
     }
@@ -329,48 +330,52 @@ class _AvatarSectionState extends State<_AvatarSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.bottomRight,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 24,
-                spreadRadius: 4,
-              ),
-            ],
+    // Listen to AuthService changes to rebuild when avatarUrl is updated
+    return ListenableBuilder(
+      listenable: widget.auth,
+      builder: (context, _) => Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 24,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 64,
+              backgroundColor: AppColors.gray200,
+              backgroundImage: _avatarImage(),
+            ),
           ),
-          child: CircleAvatar(
-            radius: 64,
-            backgroundColor: AppColors.gray200,
-            backgroundImage: _avatarImage(),
-          ),
-        ),
-        Positioned(
-          bottom: 0,
-          right: 0,
-          child: GestureDetector(
-            onTap: _changeAvatar,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.backgroundDark, width: 3),
-              ),
-              child: const Icon(
-                Icons.edit,
-                size: 16,
-                color: AppColors.backgroundDark,
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: _changeAvatar,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.backgroundDark, width: 3),
+                ),
+                child: const Icon(
+                  Icons.edit,
+                  size: 16,
+                  color: AppColors.backgroundDark,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

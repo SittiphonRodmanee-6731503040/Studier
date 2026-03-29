@@ -12,11 +12,32 @@ import 'firebase_service.dart';
 /// When `false`                            → Firebase Auth + Firestore.
 /// SECURITY: Mock mode only available in debug builds
 class AuthService extends ChangeNotifier {
+  bool _isInitialized = false;
+
+  /// Whether auth state has been checked (for showing loading screen)
+  bool get isInitialized => _isInitialized;
+
   AuthService() {
-    if (!AppConfig.useMockData) {
-      // Listen for Firebase auth state changes (e.g. token refresh, sign-out).
-      fb.FirebaseAuth.instance.authStateChanges().listen(_onAuthStateChanged);
+    _initializeAuth();
+  }
+
+  Future<void> _initializeAuth() async {
+    if (AppConfig.useMockData) {
+      _isInitialized = true;
+      notifyListeners();
+      return;
     }
+
+    // SECURITY: Check if user is already logged in from previous session
+    final existingUser = fb.FirebaseAuth.instance.currentUser;
+    if (existingUser != null) {
+      _currentUser = await FirebaseService.instance.getUser(existingUser.uid);
+    }
+    _isInitialized = true;
+    notifyListeners();
+
+    // Listen for future auth state changes (login, logout, token refresh)
+    fb.FirebaseAuth.instance.authStateChanges().listen(_onAuthStateChanged);
   }
 
   // ── State ─────────────────────────────────────────────────────────────────

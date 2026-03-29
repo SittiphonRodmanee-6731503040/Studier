@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/user_model.dart';
@@ -112,10 +114,11 @@ class FirebaseService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /// Upload avatar bytes and return the download URL.
-  Future<String> uploadAvatar(String uid, List<int> bytes) async {
+  /// SECURITY: Only authenticated users can upload to their own avatar path
+  Future<String> uploadAvatar(String uid, Uint8List bytes) async {
     final ref = _storage.ref('avatars/$uid.jpg');
     await ref.putData(
-      bytes as dynamic,
+      bytes,
       SettableMetadata(contentType: 'image/jpeg'),
     );
     return await ref.getDownloadURL();
