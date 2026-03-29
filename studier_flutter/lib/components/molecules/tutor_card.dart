@@ -6,8 +6,8 @@ import '../atoms/price_tag.dart';
 import '../atoms/star_rating.dart';
 
 /// Molecule: A pressable card displaying a tutor's summary info.
-/// Contains: circular avatar, name, bio (2-line truncate), horizontal
-/// scrollable subject chips, star rating, review count, hourly rate.
+/// Contains: circular avatar, name, bio (2-line truncate), wrapped
+/// subject chips, star rating, review count, hourly rate.
 class TutorCard extends StatelessWidget {
   final Tutor tutor;
   final VoidCallback? onTap;
@@ -67,8 +67,11 @@ class TutorCard extends StatelessWidget {
                             ),
                             if (tutor.verified) ...[
                               const SizedBox(width: 4),
-                              const Icon(Icons.verified,
-                                  size: 16, color: AppColors.primary),
+                              const Icon(
+                                Icons.verified,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
                             ],
                           ],
                         ),
@@ -107,30 +110,37 @@ class TutorCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // Horizontal scrollable subject chips
-                  SizedBox(
-                    height: 28,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: tutor.subjectTags.length,
-                      separatorBuilder: (context, index) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          tutor.subjectTags[i],
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w500,
+                  // Wrap subject chips to multiple lines on narrow screens.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: tutor.subjectTags
+                        .map(
+                          (subject) => ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 130),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                subject,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
+                        )
+                        .toList(),
                   ),
 
                   const SizedBox(height: 8),

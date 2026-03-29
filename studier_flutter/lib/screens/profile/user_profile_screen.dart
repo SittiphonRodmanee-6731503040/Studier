@@ -1,19 +1,25 @@
-import 'dart:typed_data';
-
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../context/user_provider.dart';
 import '../../models/tutor_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
+import '../../components/atoms/avatar.dart';
 
 /// UserProfileScreen — matches the attached userprofile/code.html reference.
-/// Shows avatar (editable), stats, "Become a Tutor" card, and recent tutors.
+/// Shows avatar (read-only), stats, "Become a Tutor" card, and recent tutors.
 class UserProfileScreen extends StatelessWidget {
   const UserProfileScreen({super.key});
+
+  String _profileEducation(AppUser user) {
+    if (user.university.trim().isNotEmpty) return user.university;
+    final education = user.education?.trim() ?? '';
+    if (education.isNotEmpty) {
+      // Education is often in "University, Degree" format on tutor profile.
+      return education.split(',').first.trim();
+    }
+    return 'No university';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +89,7 @@ class UserProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // ── Avatar ──
-              _AvatarSection(user: user, auth: auth),
+              _AvatarSection(auth: auth),
 
               const SizedBox(height: 16),
 
@@ -103,7 +109,7 @@ class UserProfileScreen extends StatelessWidget {
                   const Icon(Icons.school, size: 16, color: AppColors.gray400),
                   const SizedBox(width: 6),
                   Text(
-                    user.university.isEmpty ? 'No university' : user.university,
+                    _profileEducation(user),
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.gray400,
@@ -149,6 +155,53 @@ class UserProfileScreen extends StatelessWidget {
                 ),
               ),
 
+              if (user.isTutor) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.badge, size: 18),
+                      label: const Text('Edit Tutor Profile'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.18),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () =>
+                          _showEditTutorProfileSheet(context, auth),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.delete_forever, size: 18),
+                    label: const Text('Delete Account'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => _confirmDeleteAccount(context, auth),
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 24),
 
               // ── Become a Tutor card ──
@@ -169,9 +222,12 @@ class UserProfileScreen extends StatelessWidget {
   void _showEditProfileSheet(BuildContext context, AuthService auth) {
     final user = auth.currentUser!;
     final nameCtrl = TextEditingController(text: user.name);
-    final uniCtrl = TextEditingController(text: user.university);
+    final educationCtrl = TextEditingController(
+      text: user.university.isNotEmpty
+          ? user.university
+          : (user.education ?? ''),
+    );
     final majorCtrl = TextEditingController(text: user.major);
-    final phoneCtrl = TextEditingController(text: user.phoneNumber ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -214,9 +270,8 @@ class UserProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 _editField('Full Name', nameCtrl),
-                _editField('University', uniCtrl),
+                _editField('Education', educationCtrl),
                 _editField('Major', majorCtrl),
-                _editField('Phone', phoneCtrl, keyboard: TextInputType.phone),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -225,9 +280,8 @@ class UserProfileScreen extends StatelessWidget {
                     onPressed: () async {
                       await auth.updateProfile(
                         name: nameCtrl.text.trim(),
-                        university: uniCtrl.text.trim(),
+                        university: educationCtrl.text.trim(),
                         major: majorCtrl.text.trim(),
-                        phoneNumber: phoneCtrl.text.trim(),
                       );
                       if (!context.mounted) return;
                       Navigator.pop(ctx);
@@ -258,6 +312,229 @@ class UserProfileScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  // ── Edit tutor profile bottom sheet ──
+  void _showEditTutorProfileSheet(BuildContext context, AuthService auth) {
+    final user = auth.currentUser!;
+    final educationCtrl = TextEditingController(
+      text: user.education ?? user.university,
+    );
+    final majorCtrl = TextEditingController(text: user.major);
+    final professionCtrl = TextEditingController(text: user.profession ?? '');
+    final lineCtrl = TextEditingController(text: user.lineId ?? '');
+    final instagramCtrl = TextEditingController(
+      text: user.instagramHandle ?? '',
+    );
+    final phoneCtrl = TextEditingController(text: user.phoneNumber ?? '');
+    final bioCtrl = TextEditingController(text: user.bio ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.gray500,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Edit Tutor Profile',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _editField('Education', educationCtrl),
+                _editField('Major', majorCtrl),
+                _editField('Profession', professionCtrl),
+                _editField('Line ID', lineCtrl),
+                _editField('Instagram Handle', instagramCtrl),
+                _editField('Phone', phoneCtrl, keyboard: TextInputType.phone),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: TextField(
+                    controller: bioCtrl,
+                    maxLines: 4,
+                    style: const TextStyle(color: AppColors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Bio',
+                      labelStyle: const TextStyle(color: AppColors.gray400),
+                      filled: true,
+                      fillColor: AppColors.backgroundDark,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.primary),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await auth.updateTutorProfile(
+                        education: educationCtrl.text.trim(),
+                        major: majorCtrl.text.trim(),
+                        profession: professionCtrl.text.trim(),
+                        lineId: lineCtrl.text.trim(),
+                        instagramHandle: instagramCtrl.text.trim(),
+                        phoneNumber: phoneCtrl.text.trim(),
+                        bio: bioCtrl.text.trim(),
+                      );
+                      if (!context.mounted) return;
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Tutor profile updated!'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.backgroundDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    child: const Text('Save Tutor Profile'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    AuthService auth,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text(
+          'Delete account?',
+          style: TextStyle(color: AppColors.white),
+        ),
+        content: const Text(
+          'This will permanently remove your account data from Firebase. This action cannot be undone.',
+          style: TextStyle(color: AppColors.gray300),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Yes, delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Show a full-screen loading overlay — prevents teardown flicker while
+    // deletion and auth state updates are in flight.
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: AppColors.backgroundDark,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Scaffold(
+          backgroundColor: AppColors.backgroundDark,
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.primary),
+                SizedBox(height: 20),
+                Text(
+                  'Deleting account…',
+                  style: TextStyle(color: AppColors.gray300, fontSize: 15),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final ok = await auth.deleteCurrentAccount();
+
+    if (!context.mounted) return;
+
+    if (ok || auth.currentUser == null) {
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil(Routes.login, (_) => false);
+    } else {
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pop(); // dismiss loading overlay
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to delete account. Please log in again and try once more.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Widget _editField(
@@ -296,204 +573,45 @@ class UserProfileScreen extends StatelessWidget {
 
 // ─── Sub-widgets ────────────────────────────────────────────────────────────
 
-/// Circular avatar with edit button + real image picker.
-class _AvatarSection extends StatefulWidget {
-  final AppUser user;
+/// Circular avatar display (read-only, no editing).
+class _AvatarSection extends StatelessWidget {
   final AuthService auth;
 
-  const _AvatarSection({required this.user, required this.auth});
-
-  @override
-  State<_AvatarSection> createState() => _AvatarSectionState();
-}
-
-class _AvatarSectionState extends State<_AvatarSection> {
-  Uint8List?
-  _pickedBytes; // holds the picked image in memory (works on web + native)
-
-  /// Build the correct image provider.
-  ImageProvider _avatarImage() {
-    // If user just picked a new photo this session, show it from memory.
-    if (_pickedBytes != null) return MemoryImage(_pickedBytes!);
-
-    // Read the latest avatarUrl from AuthService to get updated URL after upload
-    final url = widget.auth.currentUser?.avatarUrl ?? widget.user.avatarUrl;
-    if (url.isEmpty) {
-      return const AssetImage('assets/images/placeholder.png');
-    }
-    // Local asset path
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      return AssetImage(url);
-    }
-    // Everything else (network URLs, blob: URLs on web) goes through NetworkImage.
-    return NetworkImage(url);
-  }
+  const _AvatarSection({required this.auth});
 
   @override
   Widget build(BuildContext context) {
-    // Listen to AuthService changes to rebuild when avatarUrl is updated
     return ListenableBuilder(
-      listenable: widget.auth,
-      builder: (context, _) => Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 24,
-                  spreadRadius: 4,
-                ),
-              ],
+      listenable: auth,
+      builder: (context, _) => Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              blurRadius: 30,
+              spreadRadius: 6,
             ),
-            child: CircleAvatar(
-              radius: 64,
-              backgroundColor: AppColors.gray200,
-              backgroundImage: _avatarImage(),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: _changeAvatar,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.backgroundDark, width: 3),
-                ),
-                child: const Icon(
-                  Icons.edit,
-                  size: 16,
-                  color: AppColors.backgroundDark,
-                ),
-              ),
+          ],
+        ),
+        child: Container(
+          width: 128,
+          height: 128,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.backgroundDark, width: 4),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF0B4A38), Color(0xFF0A3224)],
             ),
           ),
-        ],
+          child: const Center(
+            child: Icon(Icons.school, size: 56, color: AppColors.primary),
+          ),
+        ),
       ),
     );
-  }
-
-  /// Open the device gallery / camera to pick a real photo.
-  Future<void> _changeAvatar() async {
-    final picker = ImagePicker();
-
-    // On web, camera is usually not available — default to gallery.
-    ImageSource? source;
-    if (kIsWeb) {
-      source = ImageSource.gallery;
-    } else {
-      source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        backgroundColor: AppColors.surfaceDark,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (ctx) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Change Profile Picture',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.photo_library,
-                      color: AppColors.primary,
-                    ),
-                    title: const Text(
-                      'Choose from Gallery',
-                      style: TextStyle(color: AppColors.white),
-                    ),
-                    onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-                  ),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.camera_alt,
-                      color: AppColors.primary,
-                    ),
-                    title: const Text(
-                      'Take a Photo',
-                      style: TextStyle(color: AppColors.white),
-                    ),
-                    onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    if (source == null) return; // user cancelled
-
-    final XFile? image = await picker.pickImage(
-      source: source,
-      maxWidth: 600,
-      maxHeight: 600,
-      imageQuality: 80,
-    );
-
-    if (image != null && mounted) {
-      // Read bytes so it works on both web and native.
-      final bytes = await image.readAsBytes();
-      setState(() => _pickedBytes = bytes);
-
-      // Upload to Firebase Storage and save URL to Firestore
-      final uid = widget.auth.currentUser?.id;
-      if (uid == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error: Not logged in'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      try {
-        // 1. Upload to Firebase Storage
-        final ref = FirebaseStorage.instance.ref('avatars/$uid.jpg');
-        await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-        
-        // 2. Get download URL
-        final downloadUrl = await ref.getDownloadURL();
-        
-        // 3. Save URL to Firestore
-        await widget.auth.updateProfile(avatarUrl: downloadUrl);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile picture updated!')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Upload failed: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
   }
 }
 
@@ -668,12 +786,22 @@ class _RecentTutorsSectionState extends State<_RecentTutorsSection> {
 
   Future<void> _loadTutors() async {
     final auth = UserProvider.of(context);
-    final all = await auth.fetchAllTutors();
-    if (mounted) {
-      setState(() {
-        _recentTutors = all.take(3).toList();
-        _loaded = true;
-      });
+    try {
+      final all = await auth.fetchAllTutors();
+      final currentId = auth.currentUser?.id;
+      if (mounted) {
+        setState(() {
+          _recentTutors = all.where((t) => t.id != currentId).take(3).toList();
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _recentTutors = [];
+          _loaded = true;
+        });
+      }
     }
   }
 
@@ -722,7 +850,13 @@ class _RecentTutorsSectionState extends State<_RecentTutorsSection> {
             ],
           ),
           const SizedBox(height: 12),
-          ..._recentTutors.map((t) => _RecentTutorTile(tutor: t)),
+          if (_recentTutors.isEmpty)
+            const Text(
+              'No recent tutors yet.',
+              style: TextStyle(fontSize: 13, color: AppColors.gray400),
+            )
+          else
+            ..._recentTutors.map((t) => _RecentTutorTile(tutor: t)),
         ],
       ),
     );
@@ -752,13 +886,7 @@ class _RecentTutorTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: AppColors.gray200,
-                backgroundImage: tutor.avatarUrl.startsWith('http')
-                    ? NetworkImage(tutor.avatarUrl)
-                    : AssetImage(tutor.avatarUrl) as ImageProvider,
-              ),
+              Avatar(imageUrl: tutor.avatarUrl, radius: 28),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

@@ -5,12 +5,14 @@ import '../../utils/constants.dart';
 class SearchBar extends StatelessWidget {
   final String hint;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback? onFilterTap;
 
   const SearchBar({
     super.key,
     this.hint = 'Subject, tutor, or university...',
     this.onChanged,
+    this.onSubmitted,
     this.onFilterTap,
   });
 
@@ -30,6 +32,8 @@ class SearchBar extends StatelessWidget {
           Expanded(
             child: TextField(
               onChanged: onChanged,
+              onSubmitted: onSubmitted,
+              textInputAction: TextInputAction.search,
               style: const TextStyle(fontSize: 15, color: AppColors.white),
               decoration: InputDecoration(
                 hintText: hint,
@@ -49,8 +53,11 @@ class SearchBar extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.tune,
-                    size: 18, color: AppColors.gray300),
+                child: const Icon(
+                  Icons.tune,
+                  size: 18,
+                  color: AppColors.gray300,
+                ),
               ),
             ),
         ],

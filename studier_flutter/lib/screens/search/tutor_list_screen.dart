@@ -37,7 +37,26 @@ class _TutorListScreenState extends State<TutorListScreen> {
       });
   }
 
-  List<Tutor> get _filteredTutors => _tutors;
+  List<Tutor> get _filteredTutors {
+    return _tutors.where((tutor) {
+      if (_activeFilters.contains('price') && tutor.hourlyRate >= 400) {
+        return false;
+      }
+
+      // "5 Stars" means perfect rating and at least one review.
+      if (_activeFilters.contains('rating') &&
+          (tutor.averageRating < 5.0 || tutor.totalReviews == 0)) {
+        return false;
+      }
+
+      // Temporary fallback until a dedicated availability field exists.
+      if (_activeFilters.contains('available') && !tutor.verified) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
 
   void _toggleFilter(String filter) {
     setState(() {
@@ -120,9 +139,17 @@ class _TutorListScreenState extends State<TutorListScreen> {
               height: 40,
               child: ListView(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  _PrimaryFilterChip(onTap: () {}),
+                  _PrimaryFilterChip(
+                    onTap: () {
+                      if (_activeFilters.isEmpty) return;
+                      setState(_activeFilters.clear);
+                    },
+                  ),
                   const SizedBox(width: 12),
                   _FilterChip(
                     label: 'Under ฿400/hr',
@@ -149,22 +176,32 @@ class _TutorListScreenState extends State<TutorListScreen> {
 
             // ── Tutor list ──
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: tutors.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 16),
-                itemBuilder: (_, i) {
-                  return TutorCard(
-                    tutor: tutors[i],
-                    onTap: () => Navigator.pushNamed(
-                      context,
-                      Routes.tutorProfile,
-                      arguments: tutors[i].id,
+              child: tutors.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No tutors match the selected filters.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.gray400,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: tutors.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 16),
+                      itemBuilder: (_, i) {
+                        return TutorCard(
+                          tutor: tutors[i],
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            Routes.tutorProfile,
+                            arguments: tutors[i].id,
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         ),

@@ -16,27 +16,65 @@ class Avatar extends StatelessWidget {
 
   /// Returns the right [ImageProvider] for network URLs vs local assets.
   /// SECURITY: Only HTTPS URLs are allowed for network images
-  ImageProvider _resolveImage() {
-    if (imageUrl.startsWith('https://')) {
+  ImageProvider? _resolveImage() {
+    if (imageUrl.trim().isEmpty) {
+      return null;
+    }
+    if (imageUrl.startsWith('https://') || imageUrl.startsWith('blob:')) {
       return NetworkImage(imageUrl);
     }
     // SECURITY: Reject insecure HTTP URLs - treat as asset or show default
     if (imageUrl.startsWith('http://')) {
       // Log warning in debug mode, return placeholder
       debugPrint('SECURITY WARNING: HTTP URL rejected for avatar: $imageUrl');
-      return const AssetImage('assets/images/default_avatar.png');
+      return null;
     }
     return AssetImage(imageUrl);
   }
 
+  Widget _fallbackAvatar() {
+    return Container(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0B4A38), Color(0xFF0A3224)],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.school,
+          size: radius * 0.72,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final image = _resolveImage();
+
     return Stack(
       children: [
-        CircleAvatar(
-          radius: radius,
-          backgroundColor: AppColors.gray200,
-          backgroundImage: _resolveImage(),
+        Container(
+          width: radius * 2,
+          height: radius * 2,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.backgroundDark, width: 2),
+          ),
+          child: ClipOval(
+            child: image == null
+                ? _fallbackAvatar()
+                : Image(
+                    image: image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _fallbackAvatar(),
+                  ),
+          ),
         ),
         if (showOnlineBadge)
           Positioned(

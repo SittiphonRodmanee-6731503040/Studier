@@ -240,6 +240,8 @@ List<Tutor> get kMockTutors => kMockTutorUsers
         id: u.id,
         name: u.name,
         avatarUrl: u.avatarUrl,
+        profession: u.profession ?? '',
+        education: u.education ?? u.university,
         bio: u.bio ?? '',
         hourlyRate: u.hourlyRate ?? 0,
         currency: u.currency ?? 'THB',

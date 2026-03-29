@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../models/user_model.dart';
@@ -12,10 +14,16 @@ import 'firebase_service.dart';
 /// When `false`                            → Firebase Auth + Firestore.
 /// SECURITY: Mock mode only available in debug builds
 class AuthService extends ChangeNotifier {
+  static const Duration _authFetchTimeout = Duration(seconds: 8);
   bool _isInitialized = false;
+
+  /// True while a deliberate delete/logout navigation is in progress,
+  /// so that _AuthGuard does not fire a competing redirect.
+  bool _isNavigatingAway = false;
 
   /// Whether auth state has been checked (for showing loading screen)
   bool get isInitialized => _isInitialized;
+  bool get isNavigatingAway => _isNavigatingAway;
 
   AuthService() {
     _initializeAuth();
@@ -28,13 +36,24 @@ class AuthService extends ChangeNotifier {
       return;
     }
 
-    // SECURITY: Check if user is already logged in from previous session
-    final existingUser = fb.FirebaseAuth.instance.currentUser;
-    if (existingUser != null) {
-      _currentUser = await FirebaseService.instance.getUser(existingUser.uid);
+    try {
+      // SECURITY: Check if user is already logged in from previous session
+      final existingUser = fb.FirebaseAuth.instance.currentUser;
+      if (existingUser != null) {
+        _currentUser = await FirebaseService.instance
+            .getUser(existingUser.uid)
+            .timeout(_authFetchTimeout);
+      }
+    } on TimeoutException catch (_) {
+      debugPrint('Auth init timeout while fetching user profile.');
+      _currentUser = null;
+    } catch (e) {
+      debugPrint('Auth init error: $e');
+      _currentUser = null;
+    } finally {
+      _isInitialized = true;
+      notifyListeners();
     }
-    _isInitialized = true;
-    notifyListeners();
 
     // Listen for future auth state changes (login, logout, token refresh)
     fb.FirebaseAuth.instance.authStateChanges().listen(_onAuthStateChanged);
@@ -58,13 +77,29 @@ class AuthService extends ChangeNotifier {
   // ── Firebase auth-state listener ──────────────────────────────────────────
 
   Future<void> _onAuthStateChanged(fb.User? firebaseUser) async {
+    // If we're already handling navigation (delete/logout), ignore this
+    // auth state event.
+    if (_isNavigatingAway) return;
+
     if (firebaseUser == null) {
       _currentUser = null;
       notifyListeners();
       return;
     }
-    // Fetch the Firestore user doc.
-    _currentUser = await FirebaseService.instance.getUser(firebaseUser.uid);
+
+    try {
+      // Fetch the Firestore user doc.
+      _currentUser = await FirebaseService.instance
+          .getUser(firebaseUser.uid)
+          .timeout(_authFetchTimeout);
+    } on TimeoutException catch (_) {
+      debugPrint('Auth state change timeout while fetching user profile.');
+      _currentUser = null;
+    } catch (e) {
+      debugPrint('Auth state change error: $e');
+      _currentUser = null;
+    }
+
     notifyListeners();
   }
 
@@ -158,7 +193,6 @@ class AuthService extends ChangeNotifier {
   /// Update the current user's profile fields.
   Future<void> updateProfile({
     String? name,
-    String? avatarUrl,
     String? university,
     String? major,
     String? phoneNumber,
@@ -166,7 +200,6 @@ class AuthService extends ChangeNotifier {
     if (_currentUser == null) return;
     _currentUser = _currentUser!.copyWith(
       name: name,
-      avatarUrl: avatarUrl,
       university: university,
       major: major,
       phoneNumber: phoneNumber,
@@ -177,13 +210,111 @@ class AuthService extends ChangeNotifier {
     } else {
       await FirebaseService.instance.updateUser(_currentUser!.id, {
         if (name != null) 'name': name,
-        if (avatarUrl != null) 'avatarUrl': avatarUrl,
         if (university != null) 'university': university,
         if (major != null) 'major': major,
         if (phoneNumber != null) 'phoneNumber': phoneNumber,
       });
     }
     notifyListeners();
+  }
+
+  /// Update tutor-specific profile fields.
+  Future<void> updateTutorProfile({
+    String? education,
+    String? major,
+    String? profession,
+    String? bio,
+    String? lineId,
+    String? instagramHandle,
+    String? phoneNumber,
+  }) async {
+    if (_currentUser == null) return;
+
+    _currentUser = _currentUser!.copyWith(
+      education: education,
+      university: education,
+      major: major,
+      profession: profession,
+      bio: bio,
+      lineId: lineId,
+      instagramHandle: instagramHandle,
+      phoneNumber: phoneNumber,
+    );
+
+    if (AppConfig.useMockData) {
+      _syncUser(_currentUser!);
+    } else {
+      await FirebaseService.instance.updateUser(_currentUser!.id, {
+        if (education != null) 'education': education,
+        if (education != null) 'university': education,
+        if (major != null) 'major': major,
+        if (profession != null) 'profession': profession,
+        if (bio != null) 'bio': bio,
+        if (lineId != null) 'lineId': lineId,
+        if (instagramHandle != null) 'instagramHandle': instagramHandle,
+        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+      });
+    }
+
+    notifyListeners();
+  }
+
+  /// Permanently delete current user account and related data.
+  ///
+  /// Firebase Auth may require recent login for destructive operations.
+  /// If [currentPassword] is provided for password accounts, explicit
+  /// re-authentication is attempted before deletion.
+  Future<bool> deleteCurrentAccount({String? currentPassword}) async {
+    final user = _currentUser;
+    if (user == null) return false;
+
+    _isNavigatingAway = true;
+
+    if (AppConfig.useMockData) {
+      _users.removeWhere((u) => u.id == user.id);
+      _currentUser = null;
+      return true;
+    }
+
+    try {
+      final firebaseUser = fb.FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        _isNavigatingAway = false;
+        return false;
+      }
+
+      final usesPasswordProvider = firebaseUser.providerData.any(
+        (provider) => provider.providerId == 'password',
+      );
+
+      if (usesPasswordProvider && (currentPassword ?? '').isNotEmpty) {
+        final email = firebaseUser.email;
+        if (email == null) {
+          _isNavigatingAway = false;
+          return false;
+        }
+
+        final credential = fb.EmailAuthProvider.credential(
+          email: email,
+          password: currentPassword!,
+        );
+        await firebaseUser.reauthenticateWithCredential(credential);
+      }
+
+      await FirebaseService.instance.deleteUserCompletely(user.id);
+      await firebaseUser.delete();
+
+      _currentUser = null;
+      return true;
+    } on fb.FirebaseAuthException catch (e) {
+      debugPrint('Delete account auth error: ${e.code}');
+      _isNavigatingAway = false;
+      return false;
+    } catch (e) {
+      debugPrint('Delete account error: $e');
+      _isNavigatingAway = false;
+      return false;
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -208,6 +339,7 @@ class AuthService extends ChangeNotifier {
       isTutor: true,
       profession: profession,
       education: education,
+      university: education,
       bio: bio,
       hourlyRate: hourlyRate,
       subjectTags: subjectTags,
@@ -235,7 +367,11 @@ class AuthService extends ChangeNotifier {
   /// Fetch all tutors — used by HomeScreen / search.
   Future<List<Tutor>> fetchAllTutors() async {
     if (AppConfig.useMockData) return kMockTutors;
-    return FirebaseService.instance.getAllTutors();
+    try {
+      return await FirebaseService.instance.getAllTutors();
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Fetch tutors filtered by subject.
@@ -243,7 +379,11 @@ class AuthService extends ChangeNotifier {
     if (AppConfig.useMockData) {
       return kMockTutors.where((t) => t.subjectTags.contains(subject)).toList();
     }
-    return FirebaseService.instance.getTutorsBySubject(subject);
+    try {
+      return await FirebaseService.instance.getTutorsBySubject(subject);
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Fetch a single tutor.
@@ -252,7 +392,11 @@ class AuthService extends ChangeNotifier {
       final matches = kMockTutors.where((t) => t.id == tutorId);
       return matches.isNotEmpty ? matches.first : null;
     }
-    return FirebaseService.instance.getTutor(tutorId);
+    try {
+      return await FirebaseService.instance.getTutor(tutorId);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Fetch reviews for a tutor.
@@ -260,7 +404,11 @@ class AuthService extends ChangeNotifier {
     if (AppConfig.useMockData) {
       return kMockReviews.where((r) => r.tutorId == tutorId).toList();
     }
-    return FirebaseService.instance.getReviewsForTutor(tutorId);
+    try {
+      return await FirebaseService.instance.getReviewsForTutor(tutorId);
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Submit a new review.
@@ -270,6 +418,10 @@ class AuthService extends ChangeNotifier {
       return;
     }
     await FirebaseService.instance.addReview(review);
+  }
+
+  Future<bool> likeReview(String reviewId) async {
+    return FirebaseService.instance.likeReview(reviewId);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -303,7 +455,7 @@ class AuthService extends ChangeNotifier {
       id: 'u${_users.length + 1}',
       name: name,
       email: email,
-      avatarUrl: 'https://i.pravatar.cc/300?img=${50 + _users.length}',
+      avatarUrl: '',
       university: university,
       major: major,
     );

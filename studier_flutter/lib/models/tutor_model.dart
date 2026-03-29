@@ -5,6 +5,8 @@ class Tutor {
   final String id;
   final String name;
   final String avatarUrl;
+  final String profession;
+  final String education;
   final String bio;
   final double hourlyRate;
   final String currency;
@@ -24,6 +26,8 @@ class Tutor {
     required this.id,
     required this.name,
     required this.avatarUrl,
+    this.profession = '',
+    this.education = '',
     required this.bio,
     required this.hourlyRate,
     this.currency = 'THB',
@@ -46,6 +50,9 @@ class Tutor {
       id: id ?? map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       avatarUrl: map['avatarUrl'] as String? ?? '',
+      profession: map['profession'] as String? ?? '',
+      education:
+          map['education'] as String? ?? map['university'] as String? ?? '',
       bio: map['bio'] as String? ?? '',
       hourlyRate: (map['hourlyRate'] as num?)?.toDouble() ?? 0,
       currency: map['currency'] as String? ?? 'THB',
@@ -68,6 +75,8 @@ class Tutor {
 class Review {
   final String id;
   final String tutorId;
+  final String? reviewerId;
+  final List<String> likedBy;
   final String studentName;
   final String studentAvatar;
   final int rating;
@@ -78,6 +87,8 @@ class Review {
   const Review({
     required this.id,
     required this.tutorId,
+    this.reviewerId,
+    this.likedBy = const [],
     required this.studentName,
     required this.studentAvatar,
     required this.rating,
@@ -90,6 +101,8 @@ class Review {
   Map<String, dynamic> toMap() {
     return {
       'tutorId': tutorId,
+      'reviewerId': reviewerId,
+      'likedBy': likedBy,
       'studentName': studentName,
       'studentAvatar': studentAvatar,
       'rating': rating,
@@ -104,6 +117,8 @@ class Review {
     return Review(
       id: id ?? map['id'] as String? ?? '',
       tutorId: map['tutorId'] as String? ?? '',
+      reviewerId: map['reviewerId'] as String?,
+      likedBy: List<String>.from(map['likedBy'] ?? const []),
       studentName: map['studentName'] as String? ?? '',
       studentAvatar: map['studentAvatar'] as String? ?? '',
       rating: map['rating'] as int? ?? 0,

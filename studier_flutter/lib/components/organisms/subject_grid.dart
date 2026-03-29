@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import '../atoms/subject_chip.dart';
 
 /// Organism: A horizontal scrollable row of subject chips.
@@ -16,21 +17,43 @@ class SubjectGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chipRow = Row(
+      children: [
+        for (var i = 0; i < subjects.length; i++) ...[
+          SubjectChip(
+            label: subjects[i],
+            isActive: subjects[i] == activeSubject,
+            onTap: () => onSubjectTap?.call(subjects[i]),
+          ),
+          if (i != subjects.length - 1) const SizedBox(width: 12),
+        ],
+      ],
+    );
+
     return SizedBox(
       height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        itemCount: subjects.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (_, i) {
-          final subject = subjects[i];
-          return SubjectChip(
-            label: subject,
-            isActive: subject == activeSubject,
-            onTap: () => onSubjectTap?.call(subject),
-          );
-        },
+      child: Scrollbar(
+        thumbVisibility: false,
+        thickness: 2,
+        radius: const Radius.circular(999),
+        child: ScrollConfiguration(
+          behavior: const MaterialScrollBehavior().copyWith(
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.stylus,
+              PointerDeviceKind.trackpad,
+            },
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: chipRow,
+          ),
+        ),
       ),
     );
   }

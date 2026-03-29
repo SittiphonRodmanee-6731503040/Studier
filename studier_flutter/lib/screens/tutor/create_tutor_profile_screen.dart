@@ -20,6 +20,7 @@ class _CreateTutorProfileScreenState extends State<CreateTutorProfileScreen> {
   final _nameCtrl = TextEditingController();
   final _professionCtrl = TextEditingController();
   final _educationCtrl = TextEditingController();
+  final _bioCtrl = TextEditingController();
   final _tagCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
   final _lineCtrl = TextEditingController();
@@ -40,6 +41,7 @@ class _CreateTutorProfileScreenState extends State<CreateTutorProfileScreen> {
         if (user.education != null) _educationCtrl.text = user.education!;
         if (user.profession != null) _professionCtrl.text = user.profession!;
         if (user.phoneNumber != null) _phoneCtrl.text = user.phoneNumber!;
+        if (user.bio != null) _bioCtrl.text = user.bio!;
         if (user.lineId != null) _lineCtrl.text = user.lineId!;
         if (user.instagramHandle != null) {
           _instagramCtrl.text = user.instagramHandle!;
@@ -107,9 +109,7 @@ class _CreateTutorProfileScreenState extends State<CreateTutorProfileScreen> {
     final success = await auth.registerAsTutor(
       profession: _professionCtrl.text.trim(),
       education: _educationCtrl.text.trim(),
-      bio:
-          '${_professionCtrl.text.trim()} with ${_educationCtrl.text.trim()}. '
-          'Teaching: ${_tags.join(", ")}.',
+      bio: _bioCtrl.text.trim(),
       hourlyRate: rate.toDouble(),
       subjectTags: List.from(_tags),
       lineId: line.isNotEmpty ? line : null,
@@ -171,6 +171,7 @@ class _CreateTutorProfileScreenState extends State<CreateTutorProfileScreen> {
     _nameCtrl.dispose();
     _professionCtrl.dispose();
     _educationCtrl.dispose();
+    _bioCtrl.dispose();
     _tagCtrl.dispose();
     _rateCtrl.dispose();
     _lineCtrl.dispose();
@@ -285,6 +286,11 @@ class _CreateTutorProfileScreenState extends State<CreateTutorProfileScreen> {
                     // Education
                     _label('Education'),
                     _field(_educationCtrl, 'University, Degree'),
+                    const SizedBox(height: 16),
+
+                    // Bio
+                    _label('Bio'),
+                    _fieldRaw(_bioCtrl, 'Tell more about yourself'),
                     const SizedBox(height: 16),
 
                     // Expertise / Interests (tags)

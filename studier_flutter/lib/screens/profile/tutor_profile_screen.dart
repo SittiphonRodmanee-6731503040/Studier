@@ -22,54 +22,159 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
   Tutor? _tutor;
   List<Review> _reviews = [];
   bool _loading = true;
+  String? _loadError;
+  bool _didLoad = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_didLoad) return;
+    _didLoad = true;
     _loadData();
   }
 
   Future<void> _loadData() async {
     final auth = UserProvider.of(context);
-    final results = await Future.wait([
-      auth.fetchTutor(widget.tutorId),
-      auth.fetchReviews(widget.tutorId),
-    ]);
+    Tutor? tutor;
+    List<Review> reviews = [];
+    String? error;
+
+    try {
+      tutor = await auth.fetchTutor(widget.tutorId);
+    } catch (e) {
+      error = 'Unable to load tutor details.';
+    }
+
+    try {
+      reviews = await auth.fetchReviews(widget.tutorId);
+    } catch (_) {
+      // Keep the page usable even if reviews query/index fails.
+      reviews = [];
+      error ??= 'Some tutor data could not be loaded.';
+    }
+
     if (mounted) {
       setState(() {
-        _tutor = results[0] as Tutor?;
-        _reviews = results[1] as List<Review>;
+        _tutor = tutor;
+        _reviews = reviews;
+        _loadError = error;
         _loading = false;
       });
     }
   }
 
   Future<void> _openLine(String? lineId) async {
-    if (lineId == null) return;
-    final uri = Uri.parse('https://line.me/ti/p/~$lineId');
-    if (await canLaunchUrl(uri)) await launchUrl(uri);
+    final raw = lineId?.trim() ?? '';
+    if (raw.isEmpty) return;
+
+    final normalized = raw.replaceFirst(RegExp(r'^@+'), '');
+    final appUri = Uri.parse('line://ti/p/~$normalized');
+    final webUri = Uri.parse('https://line.me/ti/p/~$normalized');
+
+    if (await _tryLaunch(appUri)) return;
+    if (await _tryLaunch(webUri, mode: LaunchMode.inAppBrowserView)) return;
+
+    _showLaunchError('Unable to open Line on this device.');
   }
 
   Future<void> _openInstagram(String? handle) async {
-    if (handle == null) return;
-    final uri = Uri.parse('https://instagram.com/$handle');
-    if (await canLaunchUrl(uri)) await launchUrl(uri);
+    final raw = handle?.trim() ?? '';
+    if (raw.isEmpty) return;
+
+    final username = raw.replaceFirst(RegExp(r'^@+'), '');
+    final appUri = Uri.parse('instagram://user?username=$username');
+    final webUri = Uri.parse('https://instagram.com/$username');
+
+    if (await _tryLaunch(appUri)) return;
+    if (await _tryLaunch(webUri, mode: LaunchMode.inAppBrowserView)) return;
+
+    _showLaunchError('Unable to open Instagram on this device.');
   }
 
   Future<void> _callPhone(String? phone) async {
-    if (phone == null) return;
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) await launchUrl(uri);
+    final value = phone?.trim() ?? '';
+    if (value.isEmpty) return;
+
+    final uri = Uri.parse('tel:$value');
+    if (await _tryLaunch(uri)) return;
+
+    _showLaunchError('Unable to open phone dialer on this device.');
+  }
+
+  Future<bool> _tryLaunch(
+    Uri uri, {
+    LaunchMode mode = LaunchMode.externalApplication,
+  }) async {
+    try {
+      return await launchUrl(uri, mode: mode);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showLaunchError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _likeReview(int index) async {
+    if (index < 0 || index >= _reviews.length) return;
+    final auth = UserProvider.of(context);
+    final uid = auth.currentUser?.id;
+    final oldReview = _reviews[index];
+
+    if (uid == null) return;
+    final isLiked = oldReview.likedBy.contains(uid);
+    final nextLikedBy = isLiked
+        ? oldReview.likedBy.where((id) => id != uid).toList()
+        : [...oldReview.likedBy, uid];
+    final nextLikes = isLiked
+        ? (oldReview.likes > 0 ? oldReview.likes - 1 : 0)
+        : oldReview.likes + 1;
+
+    setState(() {
+      _reviews[index] = Review(
+        id: oldReview.id,
+        tutorId: oldReview.tutorId,
+        likedBy: nextLikedBy,
+        studentName: oldReview.studentName,
+        studentAvatar: oldReview.studentAvatar,
+        rating: oldReview.rating,
+        comment: oldReview.comment,
+        createdAt: oldReview.createdAt,
+        likes: nextLikes,
+        reviewerId: oldReview.reviewerId,
+      );
+    });
+
+    try {
+      final ok = await auth.likeReview(oldReview.id);
+      if (!ok && mounted) {
+        setState(() {
+          _reviews[index] = oldReview;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _reviews[index] = oldReview;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    const pageBackground = AppColors.backgroundDark;
+    const panelBackground = AppColors.surfaceDark;
+
     if (_loading) {
       return Scaffold(
-        backgroundColor: AppColors.white,
+        backgroundColor: pageBackground,
         appBar: AppBar(
-          backgroundColor: AppColors.white,
-          foregroundColor: AppColors.gray900,
+          backgroundColor: pageBackground,
+          foregroundColor: AppColors.white,
           title: const Text('Tutor Profile'),
           elevation: 0.5,
         ),
@@ -83,7 +188,11 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
 
     if (tutor == null) {
       return Scaffold(
-        appBar: AppBar(),
+        backgroundColor: pageBackground,
+        appBar: AppBar(
+          backgroundColor: pageBackground,
+          foregroundColor: AppColors.white,
+        ),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -93,13 +202,13 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.gray900,
+                  color: AppColors.white,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Please go back and try again.',
-                style: TextStyle(color: AppColors.gray600),
+                style: TextStyle(color: AppColors.gray400),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -116,12 +225,17 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     }
 
     final reviews = _reviews;
+    final currentUid = UserProvider.of(context).currentUser?.id;
+    final reviewCount = reviews.length;
+    final averageRating = reviewCount == 0
+        ? 0.0
+        : reviews.fold<double>(0, (sum, r) => sum + r.rating) / reviewCount;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.gray900,
+        backgroundColor: pageBackground,
+        foregroundColor: AppColors.white,
         title: const Text('Tutor Profile'),
         elevation: 0.5,
       ),
@@ -130,45 +244,76 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header organism ──
-            TutorHeader(tutor: tutor),
+            TutorHeader(
+              tutor: tutor,
+              averageRatingOverride: averageRating,
+              totalReviewsOverride: reviewCount,
+              isDark: true,
+            ),
 
             _divider(),
 
             // ── Contact section ──
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Contact Tutor',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.gray900,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: panelBackground,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_loadError != null) ...[
+                      Text(
+                        _loadError!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.gray400,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const Text(
+                      'Contact Tutor',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.white,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  ContactButton(
-                    icon: Icons.chat,
-                    label: 'Contact via Line',
-                    onPressed: () => _openLine(tutor.lineId),
-                  ),
-                  const SizedBox(height: 12),
-                  ContactButton(
-                    icon: Icons.camera_alt,
-                    label: 'Contact via Instagram',
-                    onPressed: () => _openInstagram(tutor.instagramHandle),
-                  ),
-                  if (tutor.phoneNumber != null) ...[
                     const SizedBox(height: 12),
-                    ContactButton(
-                      icon: Icons.phone,
-                      label: 'Call ${tutor.phoneNumber}',
-                      onPressed: () => _callPhone(tutor.phoneNumber),
-                    ),
+                    if ((tutor.lineId ?? '').trim().isNotEmpty)
+                      ContactButton(
+                        icon: Icons.chat,
+                        label: 'Contact via Line',
+                        onPressed: () => _openLine(tutor.lineId),
+                        isDark: true,
+                      ),
+                    if ((tutor.instagramHandle ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ContactButton(
+                        icon: Icons.camera_alt,
+                        label: 'Contact via Instagram',
+                        onPressed: () => _openInstagram(tutor.instagramHandle),
+                        isDark: true,
+                      ),
+                    ],
+                    if ((tutor.phoneNumber ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ContactButton(
+                        icon: Icons.phone,
+                        label: 'Call ${tutor.phoneNumber}',
+                        onPressed: () => _callPhone(tutor.phoneNumber),
+                        isDark: true,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
 
@@ -177,46 +322,70 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
             // ── Reviews section ──
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Reviews (${reviews.length})',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.gray900,
-                    ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: panelBackground,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.06),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      StarRating(rating: tutor.averageRating, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${tutor.averageRating} average',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gray600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ...reviews.take(5).map((r) => ReviewItem(review: r)),
-                  if (reviews.length > 5)
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text(
-                        'See all reviews',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reviews (${reviews.length})',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.white,
                       ),
                     ),
-                ],
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        StarRating(rating: averageRating, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${averageRating.toStringAsFixed(1)} average',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gray400,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ...reviews
+                        .take(5)
+                        .toList()
+                        .asMap()
+                        .entries
+                        .map(
+                          (entry) => ReviewItem(
+                            review: entry.value,
+                            isLiked:
+                                currentUid != null &&
+                                entry.value.likedBy.contains(currentUid),
+                            onLike: () => _likeReview(entry.key),
+                            isDark: true,
+                          ),
+                        ),
+                    if (reviews.length > 5)
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          'See all reviews',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
 
@@ -227,13 +396,22 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                 width: double.infinity,
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.pushNamed(
-                    context,
-                    Routes.addReview,
-                    arguments: tutor.id,
-                  ),
+                  onPressed: () async {
+                    await Navigator.pushNamed(
+                      context,
+                      Routes.addReview,
+                      arguments: tutor.id,
+                    );
+                    if (!mounted) return;
+                    setState(() {
+                      _loading = true;
+                      _loadError = null;
+                    });
+                    await _loadData();
+                  },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.primary),
+                    backgroundColor: panelBackground,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -257,7 +435,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
   Widget _divider() => const Divider(
     height: 1,
     thickness: 1,
-    color: AppColors.gray200,
+    color: Color(0x3327D960),
     indent: 16,
     endIndent: 16,
   );

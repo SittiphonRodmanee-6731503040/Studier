@@ -9,6 +9,14 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function safeString(v) {
+      return v is string;
+    }
+
+    function safeNullableString(v) {
+      return v == null || v is string;
+    }
+
     // Users collection
     // SECURITY: Users can only read their own profile OR public tutor profiles.
     // Client is NOT allowed to change protected fields like id/email/verified/review stats.
@@ -19,7 +27,48 @@ service cloud.firestore {
       allow create: if isSelf(userId)
         && request.resource.data.id == userId
         && request.resource.data.email is string
-        && request.resource.data.verified == false;
+        && request.resource.data.verified == false
+        && request.resource.data.averageRating == 0.0
+        && request.resource.data.totalReviews == 0
+        && request.resource.data.totalSessions == 0
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'name',
+          'email',
+          'avatarUrl',
+          'university',
+          'major',
+          'phoneNumber',
+          'isTutor',
+          'profession',
+          'education',
+          'bio',
+          'hourlyRate',
+          'currency',
+          'subjectTags',
+          'averageRating',
+          'totalReviews',
+          'totalSessions',
+          'yearLevel',
+          'lineId',
+          'instagramHandle',
+          'verified'
+        ])
+        && safeString(request.resource.data.name)
+        && safeString(request.resource.data.avatarUrl)
+        && safeString(request.resource.data.university)
+        && safeString(request.resource.data.major)
+        && safeNullableString(request.resource.data.phoneNumber)
+        && request.resource.data.isTutor is bool
+        && safeNullableString(request.resource.data.profession)
+        && safeNullableString(request.resource.data.education)
+        && safeNullableString(request.resource.data.bio)
+        && (request.resource.data.hourlyRate == null || request.resource.data.hourlyRate is number)
+        && safeNullableString(request.resource.data.currency)
+        && request.resource.data.subjectTags is list
+        && safeNullableString(request.resource.data.yearLevel)
+        && safeNullableString(request.resource.data.lineId)
+        && safeNullableString(request.resource.data.instagramHandle);
 
       allow update: if isSelf(userId)
         && request.resource.data.id == resource.data.id
@@ -44,7 +93,22 @@ service cloud.firestore {
           'yearLevel',
           'lineId',
           'instagramHandle'
-        ]);
+        ])
+        && safeString(request.resource.data.name)
+        && safeString(request.resource.data.avatarUrl)
+        && safeString(request.resource.data.university)
+        && safeString(request.resource.data.major)
+        && safeNullableString(request.resource.data.phoneNumber)
+        && request.resource.data.isTutor is bool
+        && safeNullableString(request.resource.data.profession)
+        && safeNullableString(request.resource.data.education)
+        && safeNullableString(request.resource.data.bio)
+        && (request.resource.data.hourlyRate == null || request.resource.data.hourlyRate is number)
+        && safeNullableString(request.resource.data.currency)
+        && request.resource.data.subjectTags is list
+        && safeNullableString(request.resource.data.yearLevel)
+        && safeNullableString(request.resource.data.lineId)
+        && safeNullableString(request.resource.data.instagramHandle);
 
       allow delete: if isSelf(userId);
     }
@@ -54,21 +118,63 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if signedIn();
 
+      function oldLikedBy() {
+        return (resource.data.likedBy is list) ? resource.data.likedBy : [];
+      }
+
+      function newLikedBy() {
+        return (request.resource.data.likedBy is list)
+          ? request.resource.data.likedBy
+          : [];
+      }
+
       allow create: if signedIn() && 
         request.resource.data.reviewerId == request.auth.uid &&
         request.resource.data.rating >= 1 && 
         request.resource.data.rating <= 5 &&
         request.resource.data.tutorId is string &&
         request.resource.data.comment is string &&
-        request.resource.data.createdAt is timestamp;
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.likes == 0 &&
+        request.resource.data.likedBy is list &&
+        request.resource.data.likedBy.size() == 0;
 
-      allow update: if signedIn() &&
-        resource.data.reviewerId == request.auth.uid &&
-        request.resource.data.reviewerId == resource.data.reviewerId &&
-        request.resource.data.tutorId == resource.data.tutorId &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.rating >= 1 &&
-        request.resource.data.rating <= 5;
+      allow update: if signedIn() && (
+        (
+          resource.data.reviewerId == request.auth.uid &&
+          request.resource.data.reviewerId == resource.data.reviewerId &&
+          request.resource.data.tutorId == resource.data.tutorId &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.rating >= 1 &&
+          request.resource.data.rating <= 5 &&
+          request.resource.data.likes == resource.data.likes &&
+          request.resource.data.likedBy == oldLikedBy() &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'rating',
+            'comment',
+            'studentName',
+            'studentAvatar'
+          ])
+        ) || (
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes', 'likedBy']) &&
+          request.resource.data.likes is int &&
+          (
+            (
+              request.resource.data.likes == resource.data.likes + 1 &&
+              request.auth.uid in newLikedBy() &&
+              !(request.auth.uid in oldLikedBy()) &&
+              newLikedBy().size() == oldLikedBy().size() + 1 &&
+              newLikedBy().hasAll(oldLikedBy())
+            ) || (
+              request.resource.data.likes == resource.data.likes - 1 &&
+              request.auth.uid in oldLikedBy() &&
+              !(request.auth.uid in newLikedBy()) &&
+              newLikedBy().size() + 1 == oldLikedBy().size() &&
+              oldLikedBy().hasAll(newLikedBy())
+            )
+          )
+        )
+      );
 
       allow delete: if signedIn() && 
         (resource.data.reviewerId == request.auth.uid ||

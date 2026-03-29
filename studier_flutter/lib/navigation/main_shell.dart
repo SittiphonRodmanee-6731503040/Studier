@@ -17,7 +17,10 @@ class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
   // Only 2 real tabs (Home=0, Profile=1). The plus button is an action, not a tab.
-  static const _pages = <Widget>[HomeScreen(), UserProfileScreen()];
+  late final List<Widget> _pages = [
+    const HomeScreen(),
+    const UserProfileScreen(),
+  ];
 
   void _onPlusTap() {
     final auth = UserProvider.of(context);

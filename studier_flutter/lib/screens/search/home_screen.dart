@@ -30,12 +30,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadTutors() async {
     final auth = UserProvider.of(context);
-    final tutors = await auth.fetchAllTutors();
-    if (mounted)
-      setState(() {
-        _allTutors = tutors;
-        _loading = false;
-      });
+    try {
+      final tutors = await auth.fetchAllTutors();
+      if (mounted) {
+        setState(() {
+          _allTutors = tutors;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _allTutors = [];
+          _loading = false;
+        });
+      }
+    }
   }
 
   void _onSubjectTap(String subject) {
@@ -92,7 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: app.SearchBar(
                 onChanged: (value) => setState(() => _searchQuery = value),
-                onFilterTap: () {},
+                onSubmitted: (value) {
+                  setState(() => _searchQuery = value.trim());
+                  FocusScope.of(context).unfocus();
+                },
+                onFilterTap: () => Navigator.pushNamed(
+                  context,
+                  Routes.tutorList,
+                  arguments: 'All',
+                ),
               ),
             ),
 
