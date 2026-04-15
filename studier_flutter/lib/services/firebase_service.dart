@@ -1,7 +1,4 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../models/user_model.dart';
 import '../models/tutor_model.dart';
 
@@ -11,7 +8,6 @@ class FirebaseService {
   static final FirebaseService instance = FirebaseService._();
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // USERS
@@ -45,6 +41,26 @@ class FirebaseService {
   /// Update specific fields on a user document.
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     await _usersCol.doc(uid).update(data);
+  }
+
+  /// Delete user account data and related reviews.
+  Future<void> deleteUserCompletely(String uid) async {
+    // Delete reviews written by this user.
+    final byReviewer = await _reviewsCol
+        .where('reviewerId', isEqualTo: uid)
+        .get();
+    for (final doc in byReviewer.docs) {
+      await doc.reference.delete();
+    }
+
+    // If this user is a tutor, also delete reviews that target this tutor.
+    final byTutor = await _reviewsCol.where('tutorId', isEqualTo: uid).get();
+    for (final doc in byTutor.docs) {
+      await doc.reference.delete();
+    }
+
+    // Delete user profile document.
+    await _usersCol.doc(uid).delete();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -97,31 +113,6 @@ class FirebaseService {
   Future<void> addReview(Review review) async {
     // 1. Write the review document.
     await _reviewsCol.add(review.toMap());
-
-    // 2. Recalculate tutor's average rating and review count.
-    final allReviews = await getReviewsForTutor(review.tutorId);
-    final count = allReviews.length;
-    final avg = allReviews.fold<double>(0, (sum, r) => sum + r.rating) / count;
-
-    await _usersCol.doc(review.tutorId).update({
-      'totalReviews': count,
-      'averageRating': double.parse(avg.toStringAsFixed(1)),
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // STORAGE (avatar uploads)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /// Upload avatar bytes and return the download URL.
-  /// SECURITY: Only authenticated users can upload to their own avatar path
-  Future<String> uploadAvatar(String uid, Uint8List bytes) async {
-    final ref = _storage.ref('avatars/$uid.jpg');
-    await ref.putData(
-      bytes,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
-    return await ref.getDownloadURL();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
