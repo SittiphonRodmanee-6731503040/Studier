@@ -49,3 +49,6 @@ lib/firebase_options.dart
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 .firebaserc
+
+# Android signing keys/properties (local only)
+android/key.properties
